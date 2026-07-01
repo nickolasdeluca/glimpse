@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Design native launch artwork for iOS and Android, then export project-ready assets."
+    />
+    <link rel="icon" type="image/svg+xml" href="/glimpse.svg" />
+    <meta name="theme-color" content="#0d0f13" />
+    <title>Glimpse — Splash art studio</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script defer src="https://storage.ko-fi.com/cdn/scripts/overlay-widget.js"></script>
+    <script>
+      window.addEventListener("DOMContentLoaded", function () {
+        if (!window.kofiWidgetOverlay) return;
+
+        window.kofiWidgetOverlay.draw("nickolasdeluca", {
+          type: "floating-chat",
+          "floating-chat.donateButton.text": "Support me",
+          "floating-chat.donateButton.background-color": "#fcbf47",
+          "floating-chat.donateButton.text-color": "#323842"
+        });
+      });
+    </script>
+  </body>
+</html>
