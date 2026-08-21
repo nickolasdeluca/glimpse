@@ -8,7 +8,14 @@ import {
   launchScreenStoryboard,
   packageReadme
 } from "./templates";
-import type { ArtworkAsset, ArtworkVariants, EditorState } from "./types";
+import {
+  needsDarkArtwork,
+  resolveArtworkSettings,
+  type ArtworkAsset,
+  type ArtworkSettings,
+  type ArtworkVariants,
+  type EditorState
+} from "./types";
 
 const androidDensities = [
   { name: "mdpi", ratio: 1 },
@@ -55,20 +62,20 @@ async function addIosAssets(root: JSZip, editor: EditorState, artwork: ArtworkVa
     );
   }
 
-  const darkArtwork = editor.darkModeEnabled ? artwork.dark : null;
-  if (darkArtwork) {
+  const includeDark = needsDarkArtwork(editor, "ios", Boolean(artwork.dark));
+  if (includeDark) {
+    const darkArtwork = artwork.dark ?? artwork.light;
+    const darkSettings = resolveArtworkSettings(editor.artworkSettings.ios, "dark", true);
     for (const scale of scales) {
       const filename = scale === 1 ? "SplashArtworkDark.png" : `SplashArtworkDark@${scale}x.png`;
       artworkSet.file(
         filename,
-        await canvasToBlob(
-          createArtworkCanvas(200 * scale, darkArtwork, editor.artworkSettings.ios, 1)
-        )
+        await canvasToBlob(createArtworkCanvas(200 * scale, darkArtwork, darkSettings, 1))
       );
     }
   }
 
-  artworkSet.file("Contents.json", iosArtworkContents(Boolean(darkArtwork)));
+  artworkSet.file("Contents.json", iosArtworkContents(includeDark));
   colorSet.file(
     "Contents.json",
     iosColorContents(
@@ -82,9 +89,14 @@ async function addIosAssets(root: JSZip, editor: EditorState, artwork: ArtworkVa
 async function addAndroidAssets(root: JSZip, editor: EditorState, artwork: ArtworkVariants) {
   const res = root.folder("android/app/src/main/res")!;
 
-  await addAndroidArtwork(res, "drawable", artwork.light, editor);
-  if (editor.darkModeEnabled && artwork.dark) {
-    await addAndroidArtwork(res, "drawable-night", artwork.dark, editor);
+  await addAndroidArtwork(res, "drawable", artwork.light, editor.artworkSettings.android);
+  if (needsDarkArtwork(editor, "android", Boolean(artwork.dark))) {
+    await addAndroidArtwork(
+      res,
+      "drawable-night",
+      artwork.dark ?? artwork.light,
+      resolveArtworkSettings(editor.artworkSettings.android, "dark", true)
+    );
   }
 
   res.folder("values")!.file("glimpse_splash_colors.xml", androidColorsXml(editor.backgroundLight));
@@ -100,21 +112,14 @@ async function addAndroidArtwork(
   res: JSZip,
   folderPrefix: "drawable" | "drawable-night",
   artwork: ArtworkAsset,
-  editor: EditorState
+  settings: ArtworkSettings
 ) {
   for (const density of androidDensities) {
     const size = Math.round(288 * density.ratio);
     const folder = res.folder(`${folderPrefix}-${density.name}`)!;
     folder.file(
       "glimpse_splash_artwork.png",
-      await canvasToBlob(
-        createArtworkCanvas(
-          size,
-          artwork,
-          editor.artworkSettings.android,
-          ANDROID_SAFE_RATIO
-        )
-      )
+      await canvasToBlob(createArtworkCanvas(size, artwork, settings, ANDROID_SAFE_RATIO))
     );
   }
 }

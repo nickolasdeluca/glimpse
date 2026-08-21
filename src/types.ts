@@ -10,6 +10,14 @@ export interface NormalizedRect {
   height: number;
 }
 
+// Colors that can differ between light and dark appearance. Everything else
+// (placement, scale, effect strength) stays shared so one design stays coherent.
+export interface AppearanceColors {
+  tintColor: string;
+  tintAmount: number;
+  outlineColor: string;
+}
+
 export interface ArtworkSettings {
   scale: number;
   offsetX: number;
@@ -30,6 +38,8 @@ export interface ArtworkSettings {
   glow: number;
   outline: number;
   outlineColor: string;
+  darkColorsEnabled: boolean;
+  darkColors: AppearanceColors;
 }
 
 export interface EditorState {
@@ -75,7 +85,13 @@ export const defaultArtworkSettings: ArtworkSettings = {
   shadow: 0,
   glow: 0,
   outline: 0,
-  outlineColor: "#FFFFFF"
+  outlineColor: "#FFFFFF",
+  darkColorsEnabled: false,
+  darkColors: {
+    tintColor: "#FFFFFF",
+    tintAmount: 0,
+    outlineColor: "#FFFFFF"
+  }
 };
 
 export function createDefaultEditor(): EditorState {
@@ -96,6 +112,27 @@ export function createDefaultEditor(): EditorState {
 }
 
 export const defaultEditor = createDefaultEditor();
+
+// Dark appearance reuses every placement value and swaps only the color group.
+export function resolveArtworkSettings(
+  settings: ArtworkSettings,
+  appearance: PreviewAppearance,
+  darkModeEnabled: boolean
+): ArtworkSettings {
+  if (appearance !== "dark" || !darkModeEnabled || !settings.darkColorsEnabled) return settings;
+  return { ...settings, ...settings.darkColors };
+}
+
+// A dark artwork variant is exported when the user supplied dedicated dark
+// artwork or asked for dark-only colors, which recolor the light artwork.
+export function needsDarkArtwork(
+  editor: EditorState,
+  platform: PreviewPlatform,
+  hasDarkAsset: boolean
+) {
+  if (!editor.darkModeEnabled) return false;
+  return hasDarkAsset || editor.artworkSettings[platform].darkColorsEnabled;
+}
 
 export function getActiveBackground(editor: EditorState) {
   return editor.previewAppearance === "dark" && editor.darkModeEnabled

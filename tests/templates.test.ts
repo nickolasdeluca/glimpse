@@ -9,7 +9,12 @@ import {
   packageReadme
 } from "../src/templates";
 import { ANDROID_SAFE_RATIO, getArtworkGeometry } from "../src/render";
-import { defaultArtworkSettings } from "../src/types";
+import {
+  createDefaultEditor,
+  defaultArtworkSettings,
+  needsDarkArtwork,
+  resolveArtworkSettings
+} from "../src/types";
 
 describe("color conversion", () => {
   test("converts hex colors for native exports", () => {
@@ -85,5 +90,55 @@ describe("native resource templates", () => {
     expect(packageReadme("ios")).not.toContain("Android\n");
     expect(packageReadme("android")).toContain("Android\n");
     expect(packageReadme("android")).not.toContain("iOS / iPadOS");
+  });
+});
+
+describe("appearance colors", () => {
+  const darkColors = { tintColor: "#FFFFFF", tintAmount: 100, outlineColor: "#0A0A0A" };
+
+  test("keeps light colors when dark overrides are off", () => {
+    const settings = { ...defaultArtworkSettings, tintColor: "#111111", darkColors };
+    expect(resolveArtworkSettings(settings, "dark", true)).toBe(settings);
+  });
+
+  test("swaps only the color group for the dark appearance", () => {
+    const settings = {
+      ...defaultArtworkSettings,
+      tintColor: "#111111",
+      tintAmount: 100,
+      scale: 64,
+      darkColorsEnabled: true,
+      darkColors
+    };
+
+    expect(resolveArtworkSettings(settings, "light", true).tintColor).toBe("#111111");
+
+    const dark = resolveArtworkSettings(settings, "dark", true);
+    expect(dark.tintColor).toBe("#FFFFFF");
+    expect(dark.outlineColor).toBe("#0A0A0A");
+    expect(dark.scale).toBe(64);
+  });
+
+  test("ignores dark overrides while dark appearance is disabled", () => {
+    const settings = { ...defaultArtworkSettings, darkColorsEnabled: true, darkColors };
+    expect(resolveArtworkSettings(settings, "dark", false).tintColor).toBe(
+      defaultArtworkSettings.tintColor
+    );
+  });
+
+  test("exports a dark artwork variant for dark-only colors without dark artwork", () => {
+    const editor = createDefaultEditor();
+    expect(needsDarkArtwork(editor, "ios", false)).toBe(false);
+
+    editor.darkModeEnabled = true;
+    expect(needsDarkArtwork(editor, "ios", false)).toBe(false);
+    expect(needsDarkArtwork(editor, "ios", true)).toBe(true);
+
+    editor.artworkSettings.ios = { ...editor.artworkSettings.ios, darkColorsEnabled: true };
+    expect(needsDarkArtwork(editor, "ios", false)).toBe(true);
+    expect(needsDarkArtwork(editor, "android", false)).toBe(false);
+
+    editor.darkModeEnabled = false;
+    expect(needsDarkArtwork(editor, "ios", true)).toBe(false);
   });
 });

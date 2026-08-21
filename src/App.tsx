@@ -39,6 +39,8 @@ import {
   createDefaultEditor,
   defaultArtworkSettings,
   getActiveBackground,
+  resolveArtworkSettings,
+  type AppearanceColors,
   type ArtworkAsset,
   type ArtworkSettings,
   type EditorState,
@@ -55,6 +57,14 @@ const originalPreviewSettings: ArtworkSettings = {
   scale: 100,
   autoTrim: false
 };
+
+function isEditingDarkColors(editor: EditorState) {
+  return (
+    editor.darkModeEnabled &&
+    editor.previewAppearance === "dark" &&
+    editor.artworkSettings[editor.previewPlatform].darkColorsEnabled
+  );
+}
 
 export default function App() {
   const {
@@ -82,15 +92,15 @@ export default function App() {
     [commit]
   );
 
-  const updateSettings = useCallback(
-    (patch: Partial<ArtworkSettings>, transient = false) => {
+  const applySettings = useCallback(
+    (map: (settings: ArtworkSettings, current: EditorState) => ArtworkSettings, transient = false) => {
       const updater = (current: EditorState): EditorState => {
         const platforms: PreviewPlatform[] = current.platformOverrides
           ? [current.previewPlatform]
           : ["ios", "android"];
         const artworkSettings = { ...current.artworkSettings };
         for (const platform of platforms) {
-          artworkSettings[platform] = { ...artworkSettings[platform], ...patch };
+          artworkSettings[platform] = map(artworkSettings[platform], current);
         }
         return { ...current, artworkSettings };
       };
@@ -98,6 +108,24 @@ export default function App() {
       else commit(updater);
     },
     [commit, updateInteraction]
+  );
+
+  const updateSettings = useCallback(
+    (patch: Partial<ArtworkSettings>, transient = false) =>
+      applySettings((settings) => ({ ...settings, ...patch }), transient),
+    [applySettings]
+  );
+
+  // Tint and outline color route to the dark group while the dark appearance is
+  // being previewed with separate dark colors turned on.
+  const updateAppearanceColors = useCallback(
+    (patch: Partial<AppearanceColors>) =>
+      applySettings((settings, current) =>
+        isEditingDarkColors(current)
+          ? { ...settings, darkColors: { ...settings.darkColors, ...patch } }
+          : { ...settings, ...patch }
+      ),
+    [applySettings]
   );
 
   const loadArtwork = useCallback((file: File, target: PreviewAppearance = "light") => {
@@ -229,7 +257,13 @@ export default function App() {
   }
 
   const settings = editor.artworkSettings[editor.previewPlatform];
-  const displaySettings = previewOriginal ? originalPreviewSettings : settings;
+  const appearanceSettings = resolveArtworkSettings(
+    settings,
+    editor.previewAppearance,
+    editor.darkModeEnabled
+  );
+  const editingDarkColors = isEditingDarkColors(editor);
+  const displaySettings = previewOriginal ? originalPreviewSettings : appearanceSettings;
   const activeArtwork =
     editor.darkModeEnabled && editor.previewAppearance === "dark" && darkArtwork
       ? darkArtwork
@@ -543,20 +577,56 @@ export default function App() {
               />
             </div>
 
+            {editor.darkModeEnabled && (
+              <ToggleControl
+                active={settings.darkColorsEnabled}
+                label="Separate dark colors"
+                detail="Own tint and outline color for dark appearance"
+                onClick={() =>
+                  updateSettings({
+                    darkColorsEnabled: !settings.darkColorsEnabled,
+                    // Seed the dark group from the light colors so the first
+                    // dark edit starts where the light design left off.
+                    darkColors: settings.darkColorsEnabled
+                      ? settings.darkColors
+                      : {
+                          tintColor: settings.tintColor,
+                          tintAmount: settings.tintAmount,
+                          outlineColor: settings.outlineColor
+                        }
+                  })
+                }
+              />
+            )}
+
+            {settings.darkColorsEnabled && editor.darkModeEnabled && (
+              <div className="compliance-note">
+                <Palette size={14} />
+                <span>
+                  <strong>
+                    {editingDarkColors ? "Editing dark colors" : "Editing light colors"}
+                  </strong>
+                  {editingDarkColors
+                    ? "Switch the appearance to Light to edit the light colors."
+                    : "Switch the appearance to Dark to edit the dark colors."}
+                </span>
+              </div>
+            )}
+
             <div className="control-pair tint-controls">
               <ColorControl
-                label="Tint"
-                value={settings.tintColor}
-                onChange={(tintColor) => updateSettings({ tintColor })}
+                label={editingDarkColors ? "Dark tint" : "Tint"}
+                value={appearanceSettings.tintColor}
+                onChange={(tintColor) => updateAppearanceColors({ tintColor })}
               />
               <RangeControl
                 label="Strength"
-                value={settings.tintAmount}
+                value={appearanceSettings.tintAmount}
                 min={0}
                 max={100}
                 suffix="%"
                 disabled={!artwork}
-                onChange={(tintAmount) => updateSettings({ tintAmount })}
+                onChange={(tintAmount) => updateAppearanceColors({ tintAmount })}
               />
             </div>
 
@@ -621,9 +691,9 @@ export default function App() {
                 onChange={(outline) => updateSettings({ outline })}
               />
               <ColorControl
-                label="Outline color"
-                value={settings.outlineColor}
-                onChange={(outlineColor) => updateSettings({ outlineColor })}
+                label={editingDarkColors ? "Dark outline color" : "Outline color"}
+                value={appearanceSettings.outlineColor}
+                onChange={(outlineColor) => updateAppearanceColors({ outlineColor })}
               />
             </div>
           </PanelSection>

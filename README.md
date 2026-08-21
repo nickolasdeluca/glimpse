@@ -14,6 +14,7 @@ Everything runs locally in the browser. Artwork is never uploaded.
 - Linked settings by default with optional independent iOS and Android adjustments.
 - Undo, redo, reset, and before/after comparison.
 - Native light and dark appearance colors with optional alternate dark artwork.
+- Separate dark-appearance tint and outline colors, recoloring the same artwork per mode.
 - Background color presets and platform-safe default placement.
 - Optional Android 192 dp safe-area overlay.
 - Xcode-ready artwork and color asset sets with an adaptive `LaunchScreen.storyboard`.
